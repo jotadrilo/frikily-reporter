@@ -1,0 +1,10 @@
+# Node modules
+lambda-frikily/node_modules/
+
+# Result files
+lambda-frikily/report.*
+**.log
+**.zip
+
+# System files
+.DS_Store

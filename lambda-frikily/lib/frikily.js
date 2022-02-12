@@ -210,18 +210,28 @@ ${table}
 </html>`
 }
 
+function isEnvSet(env) {
+    return process.env[env] && process.env[env] === '1'
+}
+
 async function upload(name, dir, body) {
-    if (process.env.SKIP_UPLOAD && process.env.SKIP_UPLOAD === '1') {
+    if (isEnvSet('SKIP_UPLOAD') || isEnvSet('FORCE_LOCAL')) {
         return
     }
     await s3.upload({Bucket: dir, Key: name, Body: body}).promise()
 }
 
 async function download(name, dir, callback) {
+    if (isEnvSet('SKIP_DOWNLOAD') || isEnvSet('FORCE_LOCAL')) {
+        return
+    }
     await s3.getObject({Bucket: dir, Key: name}).promise().then(callback)
 }
 
 async function sendEmail(emailTo, subject, html) {
+    if (isEnvSet('SKIP_EMAIL') || isEnvSet('FORCE_LOCAL')) {
+        return
+    }
     const params = {
         Destination: {
             ToAddresses: [emailTo],
@@ -253,7 +263,7 @@ async function run(catalogs, storage, emailTo) {
     // This is helpful to identify if the data has changed by checking
     // the checksum, and compute the differences.
     let prevReportStr = '[]';
-    let prevReportHash = '';
+    let prevReportHash = 'deadbeef';
     await download(REPORT_JSON_NAME, storage.bucket, (data) => {
         prevReportStr = data.Body.toString('utf-8')
         prevReportHash = checksum(prevReportStr)
@@ -261,7 +271,7 @@ async function run(catalogs, storage, emailTo) {
 
     // Generate and upload the HTML report
     const html = await generateHtml(report, JSON.parse(prevReportStr))
-    if (process.env.WRITE_HTML_TO_DISK && process.env.WRITE_HTML_TO_DISK === '1') {
+    if (isEnvSet('WRITE_HTML_TO_DISK')) {
         await fs.writeFileSync('./index.html', html)
     }
     await upload(REPORT_HTML_NAME, storage.bucket, html)
@@ -279,7 +289,7 @@ async function run(catalogs, storage, emailTo) {
     }
 
     // Send an email if the new and previous reports differ or it was forced
-    if (hashChanged || (process.env.FORCE_SEND_EMAIL && process.env.FORCE_SEND_EMAIL === '1')) {
+    if (hashChanged || isEnvSet('FORCE_SEND_EMAIL')) {
         console.log(`# Sending an email...`)
         await sendEmail(emailTo, 'Reporte de Funkos', html)
     }

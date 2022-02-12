@@ -7,7 +7,7 @@ This application scrapes some products of the [Frikily](https://frikily.com/) we
 The safest way to run this application locally is:
 
 ```
-WRITE_HTML_TO_DISK=1 SKIP_DOWNLOAD=1 SKIP_UPLOAD=1 SKIP_EMAIL=1 node lambda-frikily/app.js
+WRITE_HTML_TO_DISK=1 FORCE_LOCAL=1 node lambda-frikily/app.js
 ```
 
 Some useful environment variables:

@@ -1,5 +1,5 @@
-var lib = require('./lib/frikily')
-var config = require('./config.json')
+const lib = require('./lib/frikily');
+const config = require('./config.json');
 
 exports.handler = async function (event, context) {
     // console.log("ENVIRONMENT VARIABLES\n" + JSON.stringify(process.env, null, 2))

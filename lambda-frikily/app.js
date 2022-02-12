@@ -1,5 +1,5 @@
-var lib = require('./lib/frikily')
-var config = require('./config.json')
+const lib = require('./lib/frikily');
+const config = require('./config.json');
 
 try {
     const allowed = ['K', 'J']
@@ -13,6 +13,7 @@ try {
         }, {})
 
     lib.run(catalogs, config.storage, config.emailTo)
+        .then(r => console.log('Done!'))
 } catch (err) {
     console.warn(`There was an error: ${err}`)
 }

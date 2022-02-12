@@ -1,13 +1,12 @@
-var AWS = require('aws-sdk')
-var Diff = require('diff')
-var axios = require('axios')
-var checksum = require('checksum')
-var cheerio = require('cheerio')
-var tableify = require('tableify')
+const AWS = require('aws-sdk');
+const axios = require('axios')
+const checksum = require('checksum')
+const cheerio = require('cheerio')
+const tableify = require('tableify')
 
-AWS.config.update({ region: 'eu-west-2' })
-var ses = new AWS.SES({ apiVersion: '2010-12-01' })
-var s3 = new AWS.S3()
+AWS.config.update({region: 'eu-west-2'})
+const ses = new AWS.SES({apiVersion: '2010-12-01'})
+const s3 = new AWS.S3()
 
 const CALENDAR_EMOJI = '🗓️'
 const DANGER_EMOJI = '⚠️'
@@ -20,17 +19,17 @@ const REPORT_HTML_NAME = 'report.html'
 const REPORT_JSON_NAME = 'report.json'
 
 function isThereStock($) {
-    var inStockStr = $('div[class="summary entry-summary"]')
+    const inStockStr = $('div[class="summary entry-summary"]')
         .first().find('p[class="en-stock"]')
-        .first().text().trim()
-    var lastStock = getLastStock($)
-    return inStockStr.match(/^En stock\s*$/) != null || lastStock != ''
+        .first().text().trim();
+    const lastStock = getLastStock($);
+    return inStockStr.match(/^En stock\s*$/) != null || lastStock !== ''
 }
 
 function getLastStock($) {
-    var lastStockStr = $('div[class="summary entry-summary"]')
+    const lastStockStr = $('div[class="summary entry-summary"]')
         .first().find('p[class="ultimo-pedido"]')
-        .first().text().trim()
+        .first().text().trim();
     return lastStockStr.match(/^Queda.*/) != null
         ? lastStockStr.match(/^Queda.*/)
         : ''
@@ -38,7 +37,7 @@ function getLastStock($) {
 
 async function processUrl(url, who) {
     // Fetch HTML of the page we want to scrape
-    const { data } = await axios.get(url)
+    const {data} = await axios.get(url)
     // Load HTML we fetched in the previous line
     const $ = cheerio.load(data)
 
@@ -71,15 +70,15 @@ async function processUrl(url, who) {
 }
 
 function getApplicants(url, catalogs) {
-    var applicants = []
-    var owners = Object.keys(catalogs)
+    const applicants = [];
+    const owners = Object.keys(catalogs);
     for (const owner of owners) {
-        var catalog = catalogs[owner]
+        const catalog = catalogs[owner];
         if (catalog.includes(url)) {
             applicants.push(owner)
         }
     }
-    if (applicants.length == 1) {
+    if (applicants.length === 1) {
         return applicants[0]
     }
     return applicants.slice(0, applicants.length - 1).join(', ') + ` y ${applicants[applicants.length - 1]}`
@@ -91,11 +90,11 @@ function getBooleanEmoji(v) {
 
 async function generateReport(catalogs) {
     // Generate unique URLs list
-    var urls = Array.from(new Set(Object.values(catalogs).flat()))
+    const urls = Array.from(new Set(Object.values(catalogs).flat()));
 
     // Process URLs to collect information
     console.log('# Processing URLs...')
-    var data = []
+    const data = [];
     for (const url of urls) {
         const item = await processUrl(url, getApplicants(url, catalogs))
         data.push(item)
@@ -112,16 +111,16 @@ function getPriceStr(prices) {
 }
 
 async function generateHtml(data, prevData) {
-    var htmlData = []
+    const htmlData = [];
     for (const product of data) {
-        if (product.inStock || product.nextStock != '') {
+        if (product.inStock || product.nextStock !== '') {
             // Find differences of some fields
-            const matches = prevData.filter(p => p.funko == product.funko)
-            const isNew = matches.length == 0
-            var prevPrice = ''
-            var prevNextStock = ''
-            var prevInStock = false
-            var prevLastItems = ''
+            const matches = prevData.filter(p => p.funko === product.funko)
+            const isNew = matches.length === 0
+            let prevPrice = '';
+            let prevNextStock = ''
+            let prevInStock = false
+            let prevLastItems = ''
             if (!isNew) {
                 try {
                     const p = matches[0]
@@ -129,29 +128,30 @@ async function generateHtml(data, prevData) {
                     prevNextStock = p.nextStock
                     prevInStock = p.inStock
                     prevLastItems = p.lastItems
-                } catch { }
+                } catch {
+                }
             }
 
-            var funko = `<a href="${product.url}">${product.funko}</a>`
-            var curAvail = product.lastItems != ''
+            const funko = `<a href="${product.url}">${product.funko}</a>`;
+            const curAvail = product.lastItems !== ''
                 ? `${DANGER_EMOJI} ${product.lastItems}`
-                : getBooleanEmoji(product.inStock)
-            var curStock = product.nextStock != ''
+                : getBooleanEmoji(product.inStock);
+            const curStock = product.nextStock !== ''
                 ? `${CALENDAR_EMOJI} ${product.nextStock}`
-                : curAvail
-            var prevAvail = prevLastItems != ''
+                : curAvail;
+            const prevAvail = prevLastItems !== ''
                 ? `${DANGER_EMOJI} ${prevLastItems}`
-                : getBooleanEmoji(prevInStock)
-            var prevStock = prevNextStock != ''
+                : getBooleanEmoji(prevInStock);
+            const prevStock = prevNextStock !== ''
                 ? `${CALENDAR_EMOJI} ${prevNextStock}`
-                : prevAvail
-            var stock = curStock != prevStock
+                : prevAvail;
+            const stock = curStock !== prevStock
                 ? `${curStock} (Prev: ${prevStock})`
-                : curStock
-            var price = getPriceStr(product.prices)
-            var priceStr = price != prevPrice
+                : curStock;
+            const price = getPriceStr(product.prices);
+            const priceStr = price !== prevPrice
                 ? `${price} (Prev: ${prevPrice})`
-                : price
+                : price;
 
             const item = {
                 'Funko': funko,
@@ -163,19 +163,107 @@ async function generateHtml(data, prevData) {
             htmlData.push(item)
         }
     }
-    return tableify(htmlData)
+
+    const css = `table {
+  border: 1px solid #ccc;
+  border-collapse: collapse;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  table-layout: fixed;
+}
+
+table caption {
+  font-size: 1.5em;
+  margin: .5em 0 .75em;
+}
+
+table tr {
+  background-color: #f8f8f8;
+  border: 1px solid #ddd;
+  padding: .35em;
+}
+
+table th,
+table td {
+  padding: .625em;
+  text-align: center;
+}
+
+table th {
+  font-size: .85em;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+@media screen and (max-width: 600px) {
+  table {
+    border: 0;
+  }
+
+  table caption {
+    font-size: 1.3em;
+  }
+
+  table thead {
+    border: none;
+    clip: rect(0 0 0 0);
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    padding: 0;
+    position: absolute;
+    width: 1px;
+  }
+
+  table tr {
+    border-bottom: 3px solid #ddd;
+    display: block;
+    margin-bottom: .625em;
+  }
+
+  table td {
+    border-bottom: 1px solid #ddd;
+    display: block;
+    font-size: .8em;
+    text-align: right;
+  }
+
+  table td::before {
+    /*
+    * aria-label has no advantage, it won't be read inside a table
+    content: attr(aria-label);
+    */
+    content: attr(data-label);
+    float: left;
+    font-weight: bold;
+    text-transform: uppercase;
+  }
+
+  table td:last-child {
+    border-bottom: 0;
+  }
+}
+
+/* general styling */
+body {
+  font-family: "Open Sans", sans-serif;
+  line-height: 1.25;
+}`
+    const html = '<style>' +${css} +'</style>' + tableify(htmlData)
+    console.log(html)
 }
 
 async function upload(name, dir, body) {
-    await s3.upload({ Bucket: dir, Key: name, Body: body }).promise()
+    await s3.upload({Bucket: dir, Key: name, Body: body}).promise()
 }
 
 async function download(name, dir, callback) {
-    await s3.getObject({ Bucket: dir, Key: name }).promise().then(callback)
+    await s3.getObject({Bucket: dir, Key: name}).promise().then(callback)
 }
 
 async function sendEmail(emailTo, subject, html) {
-    var params = {
+    const params = {
         Destination: {
             ToAddresses: [emailTo],
         },
@@ -192,7 +280,7 @@ async function sendEmail(emailTo, subject, html) {
             },
         },
         Source: emailTo,
-    }
+    };
 
     // Send email
     await ses.sendEmail(params).promise()
@@ -205,8 +293,8 @@ async function run(catalogs, storage, emailTo) {
     // Download and compute the previous report.
     // This is helpful to identify if the data has changed by checking
     // the checksum, and compute the differences.
-    var prevReportStr = ''
-    var prevReportHash = ''
+    let prevReportStr = '[]';
+    let prevReportHash = '';
     await download(REPORT_JSON_NAME, storage.bucket, (data) => {
         prevReportStr = data.Body.toString('utf-8')
         prevReportHash = checksum(prevReportStr)
@@ -217,12 +305,12 @@ async function run(catalogs, storage, emailTo) {
     await upload(REPORT_HTML_NAME, storage.bucket, html)
 
     // Compute and upload the new report hash
-    var reportStr = JSON.stringify(report, null, 2)
-    var newReportHash = checksum(reportStr)
+    const reportStr = JSON.stringify(report, null, 2);
+    const newReportHash = checksum(reportStr);
     await upload(REPORT_JSON_NAME, storage.bucket, reportStr)
 
     // Send an email if the new and previous reports differ
-    if (prevReportHash != newReportHash) {
+    if (prevReportHash !== newReportHash) {
         console.log(`# Old checksum and new checksum missmatch (${prevReportHash} vs ${newReportHash}).`)
         console.log(`# Sending an email...`)
         await sendEmail(emailTo, 'Reporte de Funkos', html)

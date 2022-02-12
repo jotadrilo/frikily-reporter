@@ -1,4 +1,5 @@
 const AWS = require('aws-sdk');
+const fs = require('fs');
 const axios = require('axios')
 const checksum = require('checksum')
 const cheerio = require('cheerio')
@@ -164,97 +165,55 @@ async function generateHtml(data, prevData) {
         }
     }
 
-    const css = `table {
-  border: 1px solid #ccc;
-  border-collapse: collapse;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  table-layout: fixed;
-}
+    // Render table
+    const table = tableify(htmlData)
 
-table caption {
-  font-size: 1.5em;
-  margin: .5em 0 .75em;
-}
-
-table tr {
-  background-color: #f8f8f8;
-  border: 1px solid #ddd;
-  padding: .35em;
-}
-
-table th,
-table td {
-  padding: .625em;
-  text-align: center;
-}
-
-table th {
-  font-size: .85em;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-}
-
-@media screen and (max-width: 600px) {
-  table {
-    border: 0;
-  }
-
-  table caption {
-    font-size: 1.3em;
-  }
-
-  table thead {
-    border: none;
-    clip: rect(0 0 0 0);
-    height: 1px;
-    margin: -1px;
-    overflow: hidden;
-    padding: 0;
-    position: absolute;
-    width: 1px;
-  }
-
-  table tr {
-    border-bottom: 3px solid #ddd;
-    display: block;
-    margin-bottom: .625em;
-  }
-
-  table td {
-    border-bottom: 1px solid #ddd;
-    display: block;
-    font-size: .8em;
-    text-align: right;
-  }
-
-  table td::before {
-    /*
-    * aria-label has no advantage, it won't be read inside a table
-    content: attr(aria-label);
-    */
-    content: attr(data-label);
-    float: left;
+    const css = `
+a {
+    color: #292929;
     font-weight: bold;
-    text-transform: uppercase;
-  }
-
-  table td:last-child {
-    border-bottom: 0;
-  }
+    text-decoration: none;
 }
 
-/* general styling */
-body {
-  font-family: "Open Sans", sans-serif;
-  line-height: 1.25;
-}`
-    const html = '<style>' +${css} +'</style>' + tableify(htmlData)
-    console.log(html)
+table {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 12px;
+    border-spacing: 0;
+}
+thead {
+    background: #f2f2f2;
+}
+tr {
+    text-align: center;
+}
+th {
+    padding: 15px 5px 15px 5px;
+}
+td {
+    padding: 5px 10px 5px 10px;
+}
+`
+    return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans&display=swap" rel="stylesheet">
+<style>
+${css}
+</style>
+<title>Reporte</title>
+</head>
+<body>
+${table}
+</body>
+</html>`
 }
 
 async function upload(name, dir, body) {
+    if (process.env.SKIP_UPLOAD && process.env.SKIP_UPLOAD === '1') {
+        return
+    }
     await s3.upload({Bucket: dir, Key: name, Body: body}).promise()
 }
 
@@ -302,6 +261,9 @@ async function run(catalogs, storage, emailTo) {
 
     // Generate and upload the HTML report
     const html = await generateHtml(report, JSON.parse(prevReportStr))
+    if (process.env.WRITE_HTML_TO_DISK && process.env.WRITE_HTML_TO_DISK === '1') {
+        await fs.writeFileSync('./index.html', html)
+    }
     await upload(REPORT_HTML_NAME, storage.bucket, html)
 
     // Compute and upload the new report hash
@@ -309,14 +271,18 @@ async function run(catalogs, storage, emailTo) {
     const newReportHash = checksum(reportStr);
     await upload(REPORT_JSON_NAME, storage.bucket, reportStr)
 
-    // Send an email if the new and previous reports differ
-    if (prevReportHash !== newReportHash) {
-        console.log(`# Old checksum and new checksum missmatch (${prevReportHash} vs ${newReportHash}).`)
+    const hashChanged = prevReportHash !== newReportHash
+    if (hashChanged) {
+        console.log(`# Old checksum and new checksum mismatch (${prevReportHash} vs ${newReportHash}).`)
+    } else {
+        console.log(`# Old checksum and new checksum are identical (${prevReportHash})...`)
+    }
+
+    // Send an email if the new and previous reports differ or it was forced
+    if (hashChanged || (process.env.FORCE_SEND_EMAIL && process.env.FORCE_SEND_EMAIL === '1')) {
         console.log(`# Sending an email...`)
         await sendEmail(emailTo, 'Reporte de Funkos', html)
-        return
     }
-    console.log(`# Old checksum and new checksum are identical (${prevReportHash})...`)
 }
 
 module.exports.run = run

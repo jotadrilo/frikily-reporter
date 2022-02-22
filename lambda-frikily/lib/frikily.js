@@ -4,10 +4,11 @@ const axios = require('axios')
 const checksum = require('checksum')
 const cheerio = require('cheerio')
 const tableify = require('tableify')
+const LocalStorage = require('./storage/LocalStorage')
+const S3Storage = require('./storage/S3Storage')
 
-AWS.config.update({region: 'eu-west-2'})
+AWS.config.update({ region: 'eu-west-2' })
 const ses = new AWS.SES({apiVersion: '2010-12-01'})
-const s3 = new AWS.S3()
 
 const CALENDAR_EMOJI = '🗓️'
 const DANGER_EMOJI = '⚠️'
@@ -214,22 +215,8 @@ function isEnvSet(env) {
     return process.env[env] && process.env[env] === '1'
 }
 
-async function upload(name, dir, body) {
-    if (isEnvSet('SKIP_UPLOAD') || isEnvSet('FORCE_LOCAL')) {
-        return
-    }
-    await s3.upload({Bucket: dir, Key: name, Body: body}).promise()
-}
-
-async function download(name, dir, callback) {
-    if (isEnvSet('SKIP_DOWNLOAD') || isEnvSet('FORCE_LOCAL')) {
-        return
-    }
-    await s3.getObject({Bucket: dir, Key: name}).promise().then(callback)
-}
-
 async function sendEmail(emailTo, subject, html) {
-    if (isEnvSet('SKIP_EMAIL') || isEnvSet('FORCE_LOCAL')) {
+    if (isEnvSet('SKIP_EMAIL')) {
         return
     }
     const params = {
@@ -255,7 +242,19 @@ async function sendEmail(emailTo, subject, html) {
     await ses.sendEmail(params).promise()
 }
 
-async function run(catalogs, storage, emailTo) {
+async function run(catalogs, storageInfo, emailTo) {
+    let storage
+    switch (storageInfo.type.toLowerCase()) {
+        case 's3':
+            storage = new S3Storage(storageInfo.bucket)
+            break;
+        case 'local':
+            storage = new LocalStorage(storageInfo.dir)
+            break;
+        deafult:
+            throw new Error(`storage type ${storageInfo.type} is not implemented`)
+    }
+
     // Generate report
     const report = await generateReport(catalogs)
 
@@ -264,22 +263,19 @@ async function run(catalogs, storage, emailTo) {
     // the checksum, and compute the differences.
     let prevReportStr = '[]';
     let prevReportHash = 'deadbeef';
-    await download(REPORT_JSON_NAME, storage.bucket, (data) => {
-        prevReportStr = data.Body.toString('utf-8')
+    await storage.read(REPORT_JSON_NAME, (data) => {
+        prevReportStr = data
         prevReportHash = checksum(prevReportStr)
     })
 
     // Generate and upload the HTML report
     const html = await generateHtml(report, JSON.parse(prevReportStr))
-    if (isEnvSet('WRITE_HTML_TO_DISK')) {
-        await fs.writeFileSync('./index.html', html)
-    }
-    await upload(REPORT_HTML_NAME, storage.bucket, html)
+    await storage.store(REPORT_HTML_NAME, html)
 
     // Compute and upload the new report hash
     const reportStr = JSON.stringify(report, null, 2);
     const newReportHash = checksum(reportStr);
-    await upload(REPORT_JSON_NAME, storage.bucket, reportStr)
+    await storage.store(REPORT_JSON_NAME, reportStr)
 
     const hashChanged = prevReportHash !== newReportHash
     if (hashChanged) {

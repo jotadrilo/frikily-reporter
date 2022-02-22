@@ -1,0 +1,7 @@
+{
+    "emailTo": "josriolop@gmail.com",
+    "storage": {
+        "type": "s3",
+        "bucket": "jotadrilo-apps/frikily"
+    }
+}

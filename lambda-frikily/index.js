@@ -1,21 +1,22 @@
 const lib = require('./lib/frikily');
-const config = require('./config.json');
+const catalogs = require('./catalogs.json');
+const config = require('./config.s3.json')
 
 exports.handler = async function (event, context) {
     // console.log("ENVIRONMENT VARIABLES\n" + JSON.stringify(process.env, null, 2))
     // console.log("EVENT\n" + JSON.stringify(event, null, 2))
 
     try {
-        const allowed = ['K', 'J']
+        const allowed = ['K', 'J', 'M']
 
-        const catalogs = Object.keys(config.catalogs)
+        const allowedCatalogs = Object.keys(catalogs)
             .filter(key => allowed.includes(key))
             .reduce((obj, key) => {
-                obj[key] = config.catalogs[key]
+                obj[key] = catalogs[key]
                 return obj
             }, {})
 
-        await lib.run(catalogs, config.storage, config.emailTo)
+        await lib.run(allowedCatalogs, config.storage, config.emailTo)
     } catch (err) {
         return {
             statusCode: 502,

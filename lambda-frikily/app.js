@@ -1,18 +1,19 @@
-const lib = require('./lib/frikily');
-const config = require('./config.json');
+const lib = require('./lib/frikily')
+const catalogs = require('./catalogs.json')
+const config = process.env.CONFIG_LOCAL === '1' ? require('./config.local.json') : require('./config.s3.json')
 
 try {
-    const allowed = ['K', 'J']
+    const allowed = ['K', 'J', 'M']
     // const allowed = ['T']
 
-    const catalogs = Object.keys(config.catalogs)
+    const allowedCatalogs = Object.keys(catalogs)
         .filter(key => allowed.includes(key))
         .reduce((obj, key) => {
-            obj[key] = config.catalogs[key]
+            obj[key] = catalogs[key]
             return obj
         }, {})
 
-    lib.run(catalogs, config.storage, config.emailTo)
+    lib.run(allowedCatalogs, config.storage, config.emailTo)
         .then(r => console.log('Done!'))
 } catch (err) {
     console.warn(`There was an error: ${err}`)

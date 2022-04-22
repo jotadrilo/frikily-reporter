@@ -2,6 +2,6 @@
     "emailTo": "josriolop@gmail.com",
     "storage": {
         "type": "local",
-        "dir": "/Users/jotadrilo/.frikily-reporter"
+        "dir": "{{HOME}}/.frikily-reporter"
     }
 }

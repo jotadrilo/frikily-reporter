@@ -1,5 +1,5 @@
 const AWS = require('aws-sdk');
-const fs = require('fs');
+const utils = require('./utils')
 const axios = require('axios')
 const checksum = require('checksum')
 const cheerio = require('cheerio')
@@ -249,9 +249,9 @@ async function run(catalogs, storageInfo, emailTo) {
             storage = new S3Storage(storageInfo.bucket)
             break;
         case 'local':
-            storage = new LocalStorage(storageInfo.dir)
+            storage = new LocalStorage(utils.render(storageInfo.dir, process.env))
             break;
-        deafult:
+        default:
             throw new Error(`storage type ${storageInfo.type} is not implemented`)
     }
 
